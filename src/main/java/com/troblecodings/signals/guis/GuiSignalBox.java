@@ -47,7 +47,6 @@ import com.troblecodings.signals.enums.PathType;
 import com.troblecodings.signals.enums.PathwayRequestResult.PathwayRequestMode;
 import com.troblecodings.signals.enums.ShowTypes;
 import com.troblecodings.signals.enums.SignalBoxPage;
-import com.troblecodings.signals.guis.UISignalBoxRendering.AreaMoveHandler;
 import com.troblecodings.signals.guis.UISignalBoxRendering.BoxEntity;
 import com.troblecodings.signals.guis.UISignalBoxRendering.SelectionType;
 import com.troblecodings.signals.guis.UISignalBoxRendering.SignalBoxConsumer;
@@ -529,7 +528,6 @@ public class GuiSignalBox extends GuiBase {
                         rendering, point, mouse), true);
                 menu.setConsumer(
                         (selection, rotation) -> helpPage.updateNextNode(selection, rotation));
-                setUpAreaTool(menu);
                 resetSelection(entity);
                 network.sendResetAllPathways();
                 resetAllSubsidiarySignals();
@@ -555,37 +553,13 @@ public class GuiSignalBox extends GuiBase {
         push(screen);
     }
 
-    private void setUpAreaTool(final UIMenu menu) {
-        final UISignalBoxRendering currentRendering = rendering;
-        currentRendering.setAreaMoveHandler(new AreaMoveHandler() {
-
-            @Override
-            public boolean canMove(final Point corner1, final Point corner2, final int dx,
-                    final int dy) {
-                return container.grid.canMoveArea(corner1, corner2, dx, dy);
-            }
-
-            @Override
-            public boolean move(final Point corner1, final Point corner2, final int dx,
-                    final int dy) {
-                if (!container.grid.moveArea(corner1, corner2, dx, dy)) {
-                    infoUpdate(I18Wrapper.format("error.movearea"));
-                    return false;
-                }
-                currentRendering.moveNodes(corner1, corner2, dx, dy);
-                network.sendMoveArea(corner1, corner2, dx, dy);
-                return true;
-            }
-        });
-        menu.setMoveToolConsumer(currentRendering::setAreaToolActive);
-    }
-
     private void initializeFieldTemplate(final SignalBoxConsumer consumer,
             final boolean showLines) {
         BoxEntity entitys =
                 UISignalBoxRendering.createSignalBoxEntity(container.grid, showLines, consumer);
         splitter = entitys.entity;
         rendering = entitys.rendering;
+        rendering.setAreaMoveSender(network::sendMoveArea);
 
         lowerEntity.add(new UIBox(UIBox.HBOX, 2));
         lowerEntity.add(splitter);

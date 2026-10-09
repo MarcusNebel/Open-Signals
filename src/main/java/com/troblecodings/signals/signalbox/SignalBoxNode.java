@@ -540,13 +540,6 @@ public class SignalBoxNode implements INetworkSaveable, ISaveable, Iterable<Mode
                 (buf, entry) -> entry.writeNetwork(buf));
     }
 
-    /**
-     * Creates a copy of this node at the given point. The path entries are not cloned but handed
-     * over to the new node, so this node must not be used anymore afterwards.
-     *
-     * @param newPoint the point of the new node
-     * @return the new node with all data of this node
-     */
     public SignalBoxNode copyTo(final Point newPoint) {
         final SignalBoxNode copy = new SignalBoxNode(newPoint, network);
         possibleModes.forEach((mode, entry) -> {

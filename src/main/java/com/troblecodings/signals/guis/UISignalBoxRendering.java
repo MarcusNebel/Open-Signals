@@ -84,6 +84,8 @@ public class UISignalBoxRendering extends UIComponent {
     private final ColorPoint[] colorSelections = new ColorPoint[SelectionType.values().length];
     private final Map<ModeIdentifier, String> trainNumbers = new HashMap<>();
     private final Set<ColorPoint> additionalPoints = new HashSet<>();
+    private final SignalBoxGrid grid;
+    private AreaMoveSender areaMoveSender;
 
     private boolean areaToolActive = false;
     private boolean areaSelecting = false;
@@ -95,10 +97,10 @@ public class UISignalBoxRendering extends UIComponent {
     private int moveDx = 0;
     private int moveDy = 0;
     private boolean moveValid = false;
-    private AreaMoveHandler areaMoveHandler = null;
 
     public UISignalBoxRendering(final SignalBoxGrid grid, final boolean showLines,
             final SignalBoxConsumer consumer, final UIEntity gridParent) {
+        this.grid = grid;
         this.showLines = showLines;
         this.consumer = consumer;
         this.gridParent = gridParent;
@@ -197,8 +199,8 @@ public class UISignalBoxRendering extends UIComponent {
         additionalPoints.remove(new ColorPoint(point, c));
     }
 
-    public void setAreaMoveHandler(final AreaMoveHandler handler) {
-        this.areaMoveHandler = handler;
+    public void setAreaMoveSender(final AreaMoveSender sender) {
+        this.areaMoveSender = sender;
     }
 
     public void setAreaToolActive(final boolean active) {
@@ -246,7 +248,6 @@ public class UISignalBoxRendering extends UIComponent {
         }
         if (event.state != EnumMouseState.CLICKED && event.state != EnumMouseState.MOVE)
             return;
-        // While a button is held the gui sends the drag updates as further CLICKED events
         if (areaSelecting || areaMoving) {
             updateAreaAction(toClampedPoint(event));
             return;
@@ -289,8 +290,7 @@ public class UISignalBoxRendering extends UIComponent {
             if (dx != moveDx || dy != moveDy) {
                 moveDx = dx;
                 moveDy = dy;
-                moveValid = areaMoveHandler != null && (dx != 0 || dy != 0)
-                        && areaMoveHandler.canMove(areaMin, areaMax, dx, dy);
+                moveValid = grid.canMoveArea(areaMin, areaMax, dx, dy);
             }
         }
     }
@@ -301,8 +301,10 @@ public class UISignalBoxRendering extends UIComponent {
             areaStart = null;
         } else if (areaMoving) {
             areaMoving = false;
-            if (moveValid && areaMoveHandler != null
-                    && areaMoveHandler.move(areaMin, areaMax, moveDx, moveDy)) {
+            if (moveValid) {
+                grid.moveArea(areaMin, areaMax, moveDx, moveDy);
+                moveNodes(areaMin, areaMax, moveDx, moveDy);
+                areaMoveSender.send(areaMin, areaMax, moveDx, moveDy);
                 areaMin = translate(areaMin, moveDx, moveDy);
                 areaMax = translate(areaMax, moveDx, moveDy);
             }
@@ -313,15 +315,7 @@ public class UISignalBoxRendering extends UIComponent {
         }
     }
 
-    /**
-     * Moves the rendered data of all nodes in the given area, has to be called after the grid
-     * moved the nodes.
-     */
-    public void moveNodes(final Point corner1, final Point corner2, final int dx, final int dy) {
-        final Point min = new Point(Math.min(corner1.getX(), corner2.getX()),
-                Math.min(corner1.getY(), corner2.getY()));
-        final Point max = new Point(Math.max(corner1.getX(), corner2.getX()),
-                Math.max(corner1.getY(), corner2.getY()));
+    private void moveNodes(final Point min, final Point max, final int dx, final int dy) {
         final Map<Point, Map<ModeSet, ModeRenderInfo>> movedRender = new HashMap<>();
         final Map<Point, String> movedLabels = new HashMap<>();
         for (final Point point : new ArrayList<>(gridRender.keySet())) {
@@ -376,20 +370,21 @@ public class UISignalBoxRendering extends UIComponent {
             drawModeSets(info, modelist);
             info.pop();
         });
-        if (areaMoving && (moveDx != 0 || moveDy != 0)) {
-            gridRender.forEach((point, modelist) -> {
-                if (!isInside(point, areaMin, areaMax))
-                    return;
-                info.push();
-                info.translate(TILE_WIDTH * (point.getX() + moveDx),
-                        TILE_WIDTH * (point.getY() + moveDy), 0);
-                drawModeSets(info, modelist);
-                info.pop();
-            });
-        }
         if (areaMin != null) {
+            final boolean preview = areaMoving && (moveDx != 0 || moveDy != 0);
+            if (preview) {
+                gridRender.forEach((point, modelist) -> {
+                    if (!isInside(point, areaMin, areaMax))
+                        return;
+                    info.push();
+                    info.translate(TILE_WIDTH * (point.getX() + moveDx),
+                            TILE_WIDTH * (point.getY() + moveDy), 0);
+                    drawModeSets(info, modelist);
+                    info.pop();
+                });
+            }
             renderRect(info, areaMin, areaMax, AREA_COLOR);
-            if (areaMoving && (moveDx != 0 || moveDy != 0)) {
+            if (preview) {
                 renderRect(info, translate(areaMin, moveDx, moveDy),
                         translate(areaMax, moveDx, moveDy),
                         moveValid ? AREA_MOVE_COLOR : AREA_INVALID_COLOR);
@@ -589,11 +584,9 @@ public class UISignalBoxRendering extends UIComponent {
 
     }
 
-    public static interface AreaMoveHandler {
+    public static interface AreaMoveSender {
 
-        boolean canMove(Point corner1, Point corner2, int dx, int dy);
-
-        boolean move(Point corner1, Point corner2, int dx, int dy);
+        void send(Point corner1, Point corner2, int dx, int dy);
     }
 
     public static interface SignalBoxConsumer

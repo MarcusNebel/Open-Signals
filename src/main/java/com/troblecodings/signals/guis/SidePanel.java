@@ -63,6 +63,7 @@ public class SidePanel {
             new ResourceLocation(OpenSignalsMain.MODID, "gui/textures/emergency.png");
 
     private boolean showHelpPage = true;
+    private boolean moveMode = false;
     private final UIEntity helpPage = new UIEntity();
     private final UIEntity infoEntity = new UIEntity();
     private final UIButton helpPageButton = new UIButton(">");
@@ -243,6 +244,7 @@ public class SidePanel {
                 GuiElements.createLabel(I18Wrapper.format("info." + mode.toString().toLowerCase()),
                         new UIEntity().getInfoTextColor(), 0.5f));
         infoEntity.add(preview);
+        infoEntity.add(getMoveToggle());
         infoEntity.add(getSpacerLine());
         infoEntity.add(GuiElements.createLabel(I18Wrapper.format("info.keys"),
                 new UIEntity().getBasicTextColor(), 0.8f));
@@ -253,6 +255,25 @@ public class SidePanel {
                         new UIEntity().getInfoTextColor(), 0.5f));
 
         addHelpPageToPlane();
+    }
+
+    private UIEntity getMoveToggle() {
+        final UIEntity toggle = GuiElements.createButton(I18Wrapper.format("info.editor.move"), e -> {
+                    moveMode = !moveMode;
+                    gui.rendering.setAreaToolActive(moveMode);
+                    updateMoveHighlight(e);
+                });
+        toggle.add(new UIToolTip(I18Wrapper.format("info.editor.move.desc")));
+        toggle.setScale(0.95f);
+        updateMoveHighlight(toggle);
+        return toggle;
+    }
+
+    private void updateMoveHighlight(final UIEntity toggle) {
+        toggle.findRecursive(UIColor.class).forEach(toggle::remove);
+        if (moveMode) {
+            toggle.add(new UIColor(UIMenu.HIGHLIGHT_COLOR));
+        }
     }
 
     public void resetHelpUsageMode() {

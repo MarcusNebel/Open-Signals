@@ -52,9 +52,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
 
     private static final int MAX_COUNTS = 9999;
 
-    /**
-     * Width and height of the grid in tiles
-     */
     public static final int GRID_SIZE = 100;
 
     protected final Map<Point, SignalBoxPathway> startsToPath = new HashMap<>();
@@ -141,17 +138,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
         node.post();
     }
 
-    /**
-     * Checks if all nodes in the given area can be moved by the given offset. The area includes
-     * both corners and the corners can be given in any order. The move is not possible if a node
-     * would leave the grid or would land on a node that is not part of the moved area.
-     *
-     * @param corner1 first corner of the area
-     * @param corner2 opposite corner of the area
-     * @param dx offset in x direction
-     * @param dy offset in y direction
-     * @return true if {@link #moveArea(Point, Point, int, int)} would succeed
-     */
     public boolean canMoveArea(final Point corner1, final Point corner2, final int dx,
             final int dy) {
         if ((dx == 0 && dy == 0) || Math.abs(dx) >= GRID_SIZE || Math.abs(dy) >= GRID_SIZE)
@@ -172,18 +158,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
         return true;
     }
 
-    /**
-     * Moves all nodes in the given area by the given offset. All data of the nodes is moved with
-     * them and references to moved nodes (protection way end, in connection point and connected
-     * train numbers) are updated. This method does not send anything over the network, client
-     * and server both have to call it.
-     *
-     * @param corner1 first corner of the area
-     * @param corner2 opposite corner of the area
-     * @param dx offset in x direction
-     * @param dy offset in y direction
-     * @return true if the area was moved
-     */
     public boolean moveArea(final Point corner1, final Point corner2, final int dx,
             final int dy) {
         if (!canMoveArea(corner1, corner2, dx, dy))
@@ -208,7 +182,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
 
     private void updateMovedReferences(final Area area, final int dx, final int dy) {
         modeGrid.values().forEach(node -> node.getModes().forEach((modeSet, option) -> {
-            // The point of an out connection belongs to another signalbox
             if (modeSet.mode.equals(EnumGuiMode.IN_CONNECTION)) {
                 updateMovedPoint(option, PathEntryType.POINT, area, dx, dy);
             }
@@ -234,26 +207,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
             entry.setValue(new Point(point.getX() + dx, point.getY() + dy));
             option.addEntry(type, entry);
         });
-    }
-
-    private static final class Area {
-
-        private final int minX;
-        private final int maxX;
-        private final int minY;
-        private final int maxY;
-
-        private Area(final Point corner1, final Point corner2) {
-            this.minX = Math.min(corner1.getX(), corner2.getX());
-            this.maxX = Math.max(corner1.getX(), corner2.getX());
-            this.minY = Math.min(corner1.getY(), corner2.getY());
-            this.maxY = Math.max(corner1.getY(), corner2.getY());
-        }
-
-        private boolean contains(final Point point) {
-            return point.getX() >= minX && point.getX() <= maxX && point.getY() >= minY
-                    && point.getY() <= maxY;
-        }
     }
 
     public void setUpNetwork(final ContainerSignalBox container) {
@@ -616,5 +569,25 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
 
     public void sendDebugPointUpdates(final List<Point> points) {
         network.sendDebugPoints(points);
+    }
+
+    private static class Area {
+
+        private final int minX;
+        private final int maxX;
+        private final int minY;
+        private final int maxY;
+
+        public Area(final Point corner1, final Point corner2) {
+            this.minX = Math.min(corner1.getX(), corner2.getX());
+            this.maxX = Math.max(corner1.getX(), corner2.getX());
+            this.minY = Math.min(corner1.getY(), corner2.getY());
+            this.maxY = Math.max(corner1.getY(), corner2.getY());
+        }
+
+        public boolean contains(final Point point) {
+            return point.getX() >= minX && point.getX() <= maxX && point.getY() >= minY
+                    && point.getY() <= maxY;
+        }
     }
 }
