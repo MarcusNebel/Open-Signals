@@ -86,6 +86,9 @@ public class UISignalBoxRendering extends UIComponent {
     private final Set<ColorPoint> additionalPoints = new HashSet<>();
     private final SignalBoxGrid grid;
     private AreaMoveSender areaMoveSender;
+    private BiConsumer<Point, Boolean> drawConsumer;
+    private boolean drawToolActive = false;
+    private Point lastDrawPoint = null;
 
     private boolean areaToolActive = false;
     private boolean areaSelecting = false;
@@ -203,6 +206,15 @@ public class UISignalBoxRendering extends UIComponent {
         this.areaMoveSender = sender;
     }
 
+    public void setDrawConsumer(final BiConsumer<Point, Boolean> consumer) {
+        this.drawConsumer = consumer;
+    }
+
+    public void setDrawToolActive(final boolean active) {
+        this.drawToolActive = active;
+        lastDrawPoint = null;
+    }
+
     public void setAreaToolActive(final boolean active) {
         this.areaToolActive = active;
         if (!active) {
@@ -231,14 +243,35 @@ public class UISignalBoxRendering extends UIComponent {
                 && point.getY() >= min.getY() && point.getY() <= max.getY();
     }
 
+    private int toTile(final double position) {
+        return (int) Math.floor(position / (TILE_WIDTH * parent.getScaleX()));
+    }
+
     private Point toClampedPoint(final MouseEvent event) {
-        final double x = event.x - parent.getLevelX();
-        final double y = event.y - parent.getLevelY();
-        final double actualWidth = TILE_WIDTH * parent.getScaleX();
-        final int tileX = (int) Math.floor(x / actualWidth);
-        final int tileY = (int) Math.floor(y / actualWidth);
+        final int tileX = toTile(event.x - parent.getLevelX());
+        final int tileY = toTile(event.y - parent.getLevelY());
         return new Point(Math.max(0, Math.min(TILE_COUNT - 1, tileX)),
                 Math.max(0, Math.min(TILE_COUNT - 1, tileY)));
+    }
+
+    private void drawMouseEvent(final MouseEvent event) {
+        if (event.state == EnumMouseState.RELEASE) {
+            lastDrawPoint = null;
+            return;
+        }
+        final boolean first = lastDrawPoint == null;
+        if ((first && (event.state != EnumMouseState.CLICKED
+                || event.key != MouseEvent.LEFT_MOUSE)) || !this.gridParent.isHovered())
+            return;
+        final int tileX = toTile(event.x - parent.getLevelX());
+        final int tileY = toTile(event.y - parent.getLevelY());
+        if (tileX < 0 || tileY < 0 || tileX >= TILE_COUNT || tileY >= TILE_COUNT)
+            return;
+        final Point point = new Point(tileX, tileY);
+        if (point.equals(lastDrawPoint))
+            return;
+        drawConsumer.accept(point, first);
+        lastDrawPoint = point;
     }
 
     private void areaMouseEvent(final MouseEvent event) {
@@ -347,6 +380,10 @@ public class UISignalBoxRendering extends UIComponent {
             return;
         if (areaToolActive) {
             areaMouseEvent(event);
+            return;
+        }
+        if (drawToolActive) {
+            drawMouseEvent(event);
             return;
         }
         if (!this.gridParent.isHovered())
