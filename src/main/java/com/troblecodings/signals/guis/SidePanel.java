@@ -53,6 +53,10 @@ import net.minecraft.util.math.BlockPos;
 public class SidePanel {
 
     private boolean showHelpPage = true;
+    private boolean moveMode = false;
+    private boolean drawMode = false;
+    private UIEntity moveToggle;
+    private UIEntity drawToggle;
     private final UIEntity helpPage = new UIEntity();
     private final UIEntity infoEntity = new UIEntity();
     private final UIButton helpPageButton = new UIButton(">");
@@ -249,6 +253,10 @@ public class SidePanel {
                 GuiElements.createLabel(I18Wrapper.format("info." + mode.toString().toLowerCase()),
                         new UIEntity().getInfoTextColor(), 0.5f));
         infoEntity.add(preview);
+        moveToggle = getToggle("move", true);
+        drawToggle = getToggle("draw", false);
+        infoEntity.add(moveToggle);
+        infoEntity.add(drawToggle);
         infoEntity.add(getSpacerLine());
         infoEntity.add(GuiElements.createLabel(I18Wrapper.format("info.keys"),
                 new UIEntity().getBasicTextColor(), 0.8f));
@@ -259,6 +267,31 @@ public class SidePanel {
                         new UIEntity().getInfoTextColor(), 0.5f));
 
         addHelpPageToPlane();
+    }
+
+    private UIEntity getToggle(final String name, final boolean move) {
+        final UIEntity toggle = GuiElements.createButton(I18Wrapper.format("info.editor." + name),
+                e -> switchTool(move));
+        toggle.add(new UIToolTip(I18Wrapper.format("info.editor." + name + ".desc")));
+        toggle.setScale(0.95f);
+        updateHighlight(toggle, move ? moveMode : drawMode);
+        return toggle;
+    }
+
+    private void switchTool(final boolean move) {
+        moveMode = move && !moveMode;
+        drawMode = !move && !drawMode;
+        gui.rendering.setAreaToolActive(moveMode);
+        gui.rendering.setDrawToolActive(drawMode);
+        updateHighlight(moveToggle, moveMode);
+        updateHighlight(drawToggle, drawMode);
+    }
+
+    private void updateHighlight(final UIEntity toggle, final boolean active) {
+        toggle.findRecursive(UIColor.class).forEach(toggle::remove);
+        if (active) {
+            toggle.add(new UIColor(UIMenu.HIGHLIGHT_COLOR));
+        }
     }
 
     public void resetHelpUsageMode() {
