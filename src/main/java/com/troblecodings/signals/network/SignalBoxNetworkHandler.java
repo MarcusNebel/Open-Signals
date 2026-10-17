@@ -141,6 +141,16 @@ public class SignalBoxNetworkHandler {
         sendBuffer(buffer);
     }
 
+    public void sendMoveArea(final Point corner1, final Point corner2, final int dx,
+            final int dy) {
+        final WriteBuffer buffer = getGridBuffer(GridNetworkMode.MOVE_AREA);
+        corner1.writeNetwork(buffer);
+        corner2.writeNetwork(buffer);
+        buffer.putInt(dx);
+        buffer.putInt(dy);
+        sendBuffer(buffer);
+    }
+
     public void sendNodeLabel(final Point point, final String label) {
         final WriteBuffer buffer = getNodeBuffer(point, NodeNetworkMode.LABEL);
         buffer.putString(label);
@@ -259,12 +269,14 @@ public class SignalBoxNetworkHandler {
         final PathOptionEntry optionEntry = node.getOrCreateOption(ident.mode);
         if (mode.equals(EntryNetworkMode.ENTRY_REMOVE)) {
             optionEntry.removeEntryNoNetwork(entryType);
-            reader.onEntryUpdate(node, entryType);
-            return;
+        } else {
+            final IPathEntry<?> entry = entryType.newValue();
+            entry.readNetwork(buffer);
+            optionEntry.addEntry(entryType, entry);
         }
-        final IPathEntry<?> entry = entryType.newValue();
-        entry.readNetwork(buffer);
-        optionEntry.addEntry(entryType, entry);
+        if (entryType.equals(PathEntryType.CONNECTED_BREAK)) {
+            node.post();
+        }
         reader.onEntryUpdate(node, entryType);
     }
 
@@ -280,6 +292,17 @@ public class SignalBoxNetworkHandler {
         } else if (mode.equals(GridNetworkMode.UPDATE_UI_PROFILE)) {
             grid.setUIProfile(UISignalBoxProfile.UI_PROFILES.get(buffer.getInt()));
             reader.handleUIProfileUpdate();
+        } else if (mode.equals(GridNetworkMode.MOVE_AREA)) {
+            final Point corner1 = Point.of(buffer);
+            final Point corner2 = Point.of(buffer);
+            final int dx = buffer.getInt();
+            final int dy = buffer.getInt();
+            if (grid.canMoveArea(corner1, corner2, dx, dy)) {
+                if (!reader.isClientSide()) {
+                    grid.resetAllPathways();
+                }
+                grid.moveArea(corner1, corner2, dx, dy);
+            }
         } else {
             final BlockPos pos = buffer.getBlockPos();
             SignalBoxHandler.unlinkPosFromSignalBox(reader.getStateInfo(), pos);
@@ -473,7 +496,7 @@ public class SignalBoxNetworkHandler {
     }
 
     protected static enum GridNetworkMode {
-        SEND_ALL, COUNTER, REMOVE_POS, UPDATE_UI_PROFILE;
+        SEND_ALL, COUNTER, REMOVE_POS, UPDATE_UI_PROFILE, MOVE_AREA;
     }
 
     protected static enum EntryNetworkMode {
