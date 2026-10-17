@@ -56,7 +56,6 @@ import com.troblecodings.signals.handler.ClientRenderUpdate;
 import com.troblecodings.signals.signalbox.MainSignalIdentifier.SignalState;
 import com.troblecodings.signals.signalbox.ModeSet;
 import com.troblecodings.signals.signalbox.Point;
-import com.troblecodings.signals.signalbox.SignalBoxUtil;
 import com.troblecodings.signals.signalbox.SignalBoxNode;
 import com.troblecodings.signals.signalbox.entrys.PathEntryType;
 import com.troblecodings.signals.signalbox.entrys.PathOptionEntry;
@@ -79,7 +78,6 @@ public class GuiSignalBox extends GuiBase {
     private SidePanel helpPage;
     protected UISignalBoxProfile profile = UISignalBoxProfile.defaultProfile;
     protected UISignalBoxRendering rendering;
-    private boolean drawAdd;
     protected final Map<BlockPos, SubsidiaryHolder> enabledSubsidiaries = new HashMap<>();
     protected final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 
@@ -212,27 +210,11 @@ public class GuiSignalBox extends GuiBase {
             final Point point, final int mouse) {
         if ((mouse != MouseEvent.LEFT_MOUSE) || !splitter.isHovered() || !isInBuildingRange(point))
             return;
-        toggleTile(rendering, point, getSelectedModeSet(menu));
-    }
+        final EnumGuiMode mode = EnumGuiMode.values()[menu.getSelection()];
+        final Rotation rotation = Rotation.values()[menu.getRotation()];
 
-    private void drawTile(final UIMenu menu, final Point point, final boolean first) {
-        final ModeSet modeSet = getSelectedModeSet(menu);
-        final boolean exists = rendering.has(point, modeSet);
-        if (first) {
-            drawAdd = !exists;
-        } else if (exists == drawAdd) {
-            return;
-        }
-        toggleTile(rendering, point, modeSet);
-    }
+        final ModeSet modeSet = new ModeSet(mode, rotation);
 
-    private ModeSet getSelectedModeSet(final UIMenu menu) {
-        return new ModeSet(EnumGuiMode.values()[menu.getSelection()],
-                Rotation.values()[menu.getRotation()]);
-    }
-
-    private void toggleTile(final UISignalBoxRendering rendering, final Point point,
-            final ModeSet modeSet) {
         container.grid.updateMode(point, modeSet);
         if (rendering.has(point, modeSet)) {
             rendering.removeMode(point, modeSet);
@@ -566,7 +548,6 @@ public class GuiSignalBox extends GuiBase {
                         profile.getEditorModeSettings().getUIBorderSettings());
                 menu.setConsumer(
                         (selection, rotation) -> helpPage.updateNextNode(selection, rotation));
-                rendering.setDrawConsumer((point, first) -> drawTile(menu, point, first));
                 resetSelection(entity);
                 container.network.sendResetAllPathways();
                 resetAllSubsidiarySignals();
@@ -598,7 +579,6 @@ public class GuiSignalBox extends GuiBase {
                 profile, settings, consumer);
         splitter = entitys.entity;
         rendering = entitys.rendering;
-        rendering.setAreaMoveSender(network::sendMoveArea);
 
         lowerEntity.add(new UIBox(UIBox.HBOX, 2));
         lowerEntity.add(splitter);
@@ -613,7 +593,6 @@ public class GuiSignalBox extends GuiBase {
     }
 
     private void initializeBasicUI() {
-        this.entity.clear();
         final String name = I18Wrapper.format("tile.signalbox.name");
 
         final UILabel titlelabel = new UILabel(name);
@@ -696,22 +675,6 @@ public class GuiSignalBox extends GuiBase {
         }));
     }
 
-    private void buildColors(final List<SignalBoxNode> nodes) {
-        nodes.forEach(node -> {
-            this.rendering.setColor(node.getPoint(), mode -> {
-                if (mode.mode == EnumGuiMode.TRAIN_NUMBER)
-                    return mode.mode.getDefaultColor();
-                if (mode.mode == EnumGuiMode.TRACK_BREAK)
-                    return node.getOption(mode).get().getEntry(PathEntryType.BREAK_COLOR)
-                            .map(index -> SignalBoxUtil.BREAK_COLORS[index - 1])
-                            .orElse(mode.mode.getDefaultColor());
-                if (node.containsManuellOutput(mode))
-                    return OUTPUT_COLOR;
-                return node.getOption(mode).get().getEntry(PathEntryType.PATHUSAGE)
-                        .orElseGet(() -> EnumPathUsage.FREE).getColor();
-            });
-        });
-    }
     private void resetColors() {
         container.grid.getNodes().forEach(node -> {
             node.forEach(mode -> {
@@ -740,13 +703,6 @@ public class GuiSignalBox extends GuiBase {
     private void updateColor(final SignalBoxNode node) {
         node.toPathIdentifier().forEach(ident -> {
             node.getOption(ident.getMode()).ifPresent(poe -> {
-                if (ident.getMode().mode == EnumGuiMode.TRACK_BREAK) {
-                    rendering.setColor(node.getPoint(), ident.getMode(),
-                            poe.getEntry(PathEntryType.BREAK_COLOR)
-                                    .map(index -> SignalBoxUtil.BREAK_COLORS[index - 1])
-                                    .orElse(EnumGuiMode.TRACK_BREAK.getDefaultColor()));
-                    return;
-                }
                 rendering.setColor(node.getPoint(), ident.getMode(),
                         poe.getEntry(PathEntryType.PATHUSAGE).orElseGet(() -> EnumPathUsage.FREE)
                                 .getColor(profile.getOperationModeSettings()));

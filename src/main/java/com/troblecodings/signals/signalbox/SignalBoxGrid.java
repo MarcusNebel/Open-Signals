@@ -18,13 +18,11 @@ import com.troblecodings.core.interfaces.INetworkSaveable;
 import com.troblecodings.core.interfaces.ISaveable;
 import com.troblecodings.signals.OpenSignalsMain;
 import com.troblecodings.signals.blocks.CombinedRedstoneInput;
-import com.troblecodings.signals.core.ModeIdentifier;
 import com.troblecodings.signals.core.NetworkBufferWrappers;
 import com.troblecodings.signals.core.RedstoneUpdatePacket;
 import com.troblecodings.signals.core.StateInfo;
 import com.troblecodings.signals.core.SubsidiaryState;
 import com.troblecodings.signals.core.TrainNumber;
-import com.troblecodings.signals.enums.EnumGuiMode;
 import com.troblecodings.signals.enums.EnumPathUsage;
 import com.troblecodings.signals.enums.PathType;
 import com.troblecodings.signals.enums.PathwayRequestResult;
@@ -33,7 +31,6 @@ import com.troblecodings.signals.guis.UISignalBoxProfile;
 import com.troblecodings.signals.handler.SignalBoxHandler;
 import com.troblecodings.signals.network.SignalBoxNetworkHandler;
 import com.troblecodings.signals.signalbox.debug.SignalBoxFactory;
-import com.troblecodings.signals.signalbox.entrys.IPathEntry;
 import com.troblecodings.signals.signalbox.entrys.PathEntryType;
 import com.troblecodings.signals.signalbox.entrys.PathOptionEntry;
 
@@ -52,8 +49,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
     private static final String SIGNALBOX_UI_PROFILE = "signalBoxUIProfile";
 
     private static final int MAX_COUNTS = 9999;
-
-    public static final int GRID_SIZE = 100;
 
     protected final Map<Point, SignalBoxPathway> startsToPath = new HashMap<>();
     protected final Map<Point, SignalBoxPathway> endsToPath = new HashMap<>();
@@ -148,91 +143,6 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
         node.post();
     }
 
-    public boolean canMoveArea(final Point corner1, final Point corner2, final int dx,
-            final int dy) {
-        if ((dx == 0 && dy == 0) || Math.abs(dx) >= GRID_SIZE || Math.abs(dy) >= GRID_SIZE)
-            return false;
-        final Area area = new Area(corner1, corner2);
-        for (final SignalBoxNode node : getNodesInArea(area)) {
-            final int newX = node.getPoint().getX() + dx;
-            final int newY = node.getPoint().getY() + dy;
-            if (newX < 0 || newY < 0 || newX >= GRID_SIZE || newY >= GRID_SIZE)
-                return false;
-            final Point target = new Point(newX, newY);
-            if (area.contains(target))
-                continue;
-            final SignalBoxNode other = modeGrid.get(target);
-            if (other != null && !other.isEmpty())
-                return false;
-        }
-        return true;
-    }
-
-    public boolean moveArea(final Point corner1, final Point corner2, final int dx,
-            final int dy) {
-        if (!canMoveArea(corner1, corner2, dx, dy))
-            return false;
-        final Area area = new Area(corner1, corner2);
-        final List<SignalBoxNode> nodes = getNodesInArea(area);
-        nodes.forEach(node -> modeGrid.remove(node.getPoint()));
-        nodes.forEach(node -> {
-            final Point newPoint =
-                    new Point(node.getPoint().getX() + dx, node.getPoint().getY() + dy);
-            modeGrid.put(newPoint, node.copyTo(newPoint));
-        });
-        updateMovedReferences(area, dx, dy);
-        modeGrid.values().forEach(SignalBoxNode::post);
-        return true;
-    }
-
-    private List<SignalBoxNode> getNodesInArea(final Area area) {
-        return modeGrid.values().stream()
-                .filter(node -> !node.isEmpty() && area.contains(node.getPoint()))
-                .collect(Collectors.toList());
-    }
-
-    private void updateMovedReferences(final Area area, final int dx, final int dy) {
-        modeGrid.values().forEach(node -> node.getModes().forEach((modeSet, option) -> {
-            if (modeSet.mode.equals(EnumGuiMode.IN_CONNECTION)) {
-                updateMovedPoint(option, PathEntryType.POINT, area, dx, dy);
-            }
-            updateMovedPoint(option, PathEntryType.PROTECTIONWAY_END, area, dx, dy);
-            updateMovedIdent(option, PathEntryType.CONNECTED_TRAINNUMBER, area, dx, dy);
-            updateMovedIdent(option, PathEntryType.CONNECTED_BREAK, area, dx, dy);
-        }));
-    }
-
-    private static void updateMovedIdent(final PathOptionEntry option,
-            final PathEntryType<ModeIdentifier> type, final Area area, final int dx,
-            final int dy) {
-        option.getEntry(type).ifPresent(ident -> {
-            if (ident.point == null || !area.contains(ident.point))
-                return;
-            final IPathEntry<ModeIdentifier> entry = type.newValue();
-            entry.setValue(new ModeIdentifier(
-                    new Point(ident.point.getX() + dx, ident.point.getY() + dy), ident.mode));
-            option.addEntry(type, entry);
-        });
-    }
-
-    private static void updateMovedPoint(final PathOptionEntry option,
-            final PathEntryType<Point> type, final Area area, final int dx, final int dy) {
-        option.getEntry(type).ifPresent(point -> {
-            if (!area.contains(point))
-                return;
-            final IPathEntry<Point> entry = type.newValue();
-            entry.setValue(new Point(point.getX() + dx, point.getY() + dy));
-            option.addEntry(type, entry);
-        });
-    }
-
-    public void setUpNetwork(final ContainerSignalBox container) {
-        network.setUpNetwork(container);
-    }
-
-    public void removeNetwork() {
-        network.removeNetwork();
-    }
     public SignalBoxNetworkHandler getNetwork() {
         return network;
     }
@@ -604,25 +514,5 @@ public class SignalBoxGrid implements INetworkSaveable, ISaveable {
 
     public void removeLinkedPosFromEntries(final BlockPos pos) {
         modeGrid.values().forEach(node -> node.removeLinkedPos(pos));
-    }
-
-    private static class Area {
-
-        private final int minX;
-        private final int maxX;
-        private final int minY;
-        private final int maxY;
-
-        public Area(final Point corner1, final Point corner2) {
-            this.minX = Math.min(corner1.getX(), corner2.getX());
-            this.maxX = Math.max(corner1.getX(), corner2.getX());
-            this.minY = Math.min(corner1.getY(), corner2.getY());
-            this.maxY = Math.max(corner1.getY(), corner2.getY());
-        }
-
-        public boolean contains(final Point point) {
-            return point.getX() >= minX && point.getX() <= maxX && point.getY() >= minY
-                    && point.getY() <= maxY;
-        }
     }
 }

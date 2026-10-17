@@ -228,8 +228,7 @@ public class ContainerSignalBox extends ContainerBase
                     ClientSignalStateHandler.getClientStates(info);
             final Map<SubsidiaryState, ConfigProperty> subsidiaries =
                     SubsidiarySignalParser.SUBSIDIARY_SIGNALS.get(signal);
-            System.out.println("Properties for [" + info + "]: " + properties);
-            if (subsidiaries == null || properties.isEmpty())
+            if (subsidiaries == null)
                 return;
             final List<SubsidiaryState> validStates = new ArrayList<>();
             subsidiaries.forEach((state, config) -> {
