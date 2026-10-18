@@ -25,6 +25,7 @@ import com.troblecodings.signals.handler.SignalStateHandler;
 import com.troblecodings.signals.init.OSBlocks;
 import com.troblecodings.signals.init.OSItems;
 import com.troblecodings.signals.init.OSSounds;
+import com.troblecodings.signals.migration.OSCommand;
 import com.troblecodings.signals.proxy.CommonProxy;
 
 import net.minecraftforge.common.MinecraftForge;
@@ -35,6 +36,7 @@ import net.minecraftforge.fml.common.Mod.Instance;
 import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import net.minecraftforge.fml.common.event.FMLServerStoppingEvent;
 
 @Mod(modid = OpenSignalsMain.MODID, acceptedMinecraftVersions = "[1.12.2]")
@@ -82,6 +84,11 @@ public class OpenSignalsMain {
      */
     public static boolean isDebug() {
         return debug;
+    }
+
+    @EventHandler
+    public void onServerStart(final FMLServerStartingEvent event) {
+        event.registerServerCommand(new OSCommand());
     }
 
     @EventHandler
