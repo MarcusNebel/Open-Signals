@@ -14,6 +14,7 @@ import com.troblecodings.signals.init.OSBlocks;
 import com.troblecodings.signals.init.OSItems;
 import com.troblecodings.signals.init.OSModels;
 import com.troblecodings.signals.init.OSSounds;
+import com.troblecodings.signals.migration.WorldImporter;
 import com.troblecodings.signals.proxy.ClientProxy;
 import com.troblecodings.signals.proxy.CommonProxy;
 
@@ -53,6 +54,7 @@ public class OpenSignalsMain {
         eventBus.register(OSSounds.class);
         MinecraftForge.EVENT_BUS.register(NameHandler.class);
         MinecraftForge.EVENT_BUS.register(SignalBoxHandler.class);
+        MinecraftForge.EVENT_BUS.register(WorldImporter.class);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ConfigHandler.CLIENT_SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigHandler.GENERAL_SPEC);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> eventBus.register(OSModels.class));
